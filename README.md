@@ -4,7 +4,7 @@
 
 
 ## Introduction:
-**script-ll** is a lined-language that was designed for writing scripts.
+**script-ll** is a lined-language designed for writing scripts.
 
 ## Quick Start:
 You could go to the examples folder and take a look at the contents of [tutorial.ll](https://github.com/vs-123/script-ll/blob/main/examples/tutorial.ll)
