@@ -9,6 +9,13 @@
 ## Quick Start:
 You could go to the examples folder and take a look at the contents of [tutorial.ll](https://github.com/vs-123/script-ll/blob/main/examples/tutorial.ll)
 
+## Usage:
+To execute a script-ll file, follow the following steps:
+ - Install Rust.
+ - Download this repository or use the command `git clone https://github.com/vs-123/script-ll.git`.
+ - Launch terminal/command prompt and navigate to the repository
+ - Use the command `cargo run <FILE_NAME>.ll` where `<FILE_NAME>` is the name of your file.
+
 ## Commands
 For now (since 18 October 2021), there are 16 (sixteen) commands:
  - `exists <VARIABLE_NAME> <TYPE> info: Checks for the existence of a variable called <IDENTIFIER> of type <TYPE>.`
