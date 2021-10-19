@@ -14,10 +14,11 @@ You could go to the examples folder and take a look at the contents of [tutorial
 
 To execute a script-ll file, follow the following steps:
 
-- Install Rust.
-- Download this repository or use the command `git clone https://github.com/vs-123/script-ll.git`.
-- Launch terminal/command prompt and navigate to the repository
-- Use the command `cargo run <FILE_NAME>.ll` where `<FILE_NAME>` is the name of your file.
+- Go to https://github.com/vs-123/script-ll/releases
+- Download any one of them based on your OS
+- Unpack it
+- Add the location of the folder where script-ll belongs to your environment variable path
+- Then use the command `script-ll <file>` where `<file>` is the name of the file you're executing.
 
 ## Commands
 
