@@ -13,14 +13,17 @@ mod lexer;
 use errors::*;
 
 fn get_type(token: String) -> ast::Types {
-    let number_re = Regex::new(r"^[0-9]+").unwrap();
+    let number_re = Regex::new(r"^[0-9]+$").unwrap();
+    let identifier_re = Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*$").unwrap();
     
     if token.starts_with('\"') && token.ends_with('\"') {
         ast::Types::String
     } else if number_re.is_match(&token) {
         ast::Types::Number
-    } else {
+    } else if identifier_re.is_match(&token) {
         ast::Types::Identifier
+    } else {
+        ast::Types::Unknown
     }
 }
 
@@ -157,6 +160,10 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                 to_print = get_string_content(to_print.clone());
                             }
                         }
+
+                        _ => {
+                            print_error(format!("\nCode:\n{} | {}\nProblem: Invalid type.", line_number, string_line.clone()));
+                        }
                     }
 
                     print!("{}", to_print);
@@ -180,7 +187,7 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
                         match get_variable(item1.clone(), variables.clone()) {
-                            Ok((value, value_type)) => {
+                            Ok((value, _)) => {
                                 item1 = value;
                             },
                             Err(e) => {
@@ -191,7 +198,7 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
                         match get_variable(item2.clone(), variables.clone()) {
-                            Ok((value, value_type)) => {
+                            Ok((value, _)) => {
                                 item2 = value;
                             },
                             Err(e) => {
@@ -200,16 +207,17 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         }
                     }
 
-                    if get_type(item1.clone()) != get_type(item2.clone()) {
-                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot add `{}` and `{}` as they are not of the same type.", line_number, string_line.clone(), args[0].clone(), args[1].clone()));
-                    }
-
                     match (get_type(item1.clone()), get_type(item2.clone())) {
-                        (ast::Types::String, ast::Types::String) |
-                        (ast::Types::String, ast::Types::Number) |
-                        (ast::Types::Number, ast::Types::String)
-                        => {
-                            variables.insert("TEMP".to_string(), item1.clone() + &item2.clone());
+                        (ast::Types::String, ast::Types::String) => {
+                            variables.insert("TEMP".to_string(), "\"".to_owned() + &get_string_content(item1.clone()) + &get_string_content(item2.clone()) + "\"");
+                        }
+
+                        (ast::Types::Number, ast::Types::String) => {
+                            variables.insert("TEMP".to_string(), "\"".to_owned() + &item1.clone() + &get_string_content(item2.clone()) + "\"");
+                        }
+
+                        (ast::Types::String, ast::Types::Number) => {
+                            variables.insert("TEMP".to_string(), "\"".to_owned() + &get_string_content(item1.clone()) + &item2.clone() + "\"");
                         }
 
                         (ast::Types::Number, ast::Types::Number) => {
@@ -584,6 +592,58 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     }
 
                     if item1 == item2 {
+                        if !labels.contains_key(&label_name) {
+                            print_error(format!("\nCode:\n{} | {}\nProblem: Label `{}` does not exist.", line_number, string_line.clone(), label_name));
+                        }
+
+                        let label_code = labels.get(&label_name).unwrap().clone();
+
+                        interpret(label_code, variables, labels);
+                    }
+                }
+            }
+
+            "jmp_not_eq" => {
+                if args_len != 3 {
+                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.", line_number, string_line.clone(), args_len));
+                } else {
+                    let mut item1 = args[0].clone();
+                    let mut item1_type: ast::Types = ast::Types::Number;
+
+                    let mut item2 = args[1].clone();
+                    let mut item2_type: ast::Types = ast::Types::Number;
+
+                    let label_name = args[2].clone();
+
+                    if get_type(item1.clone()) == ast::Types::Identifier {
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                item1 = value;
+                                item1_type = value_type;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
+                        }
+                    }
+
+                    if get_type(item2.clone()) == ast::Types::Identifier {
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                item2 = value;
+                                item2_type = value_type;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
+                        }
+                    }
+
+                    if item1_type != item2_type {
+                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot compare `{}` and `{}` as they are not the same type.", line_number, string_line.clone(), args[0].clone(), args[1].clone()));
+                    }
+
+                    if item1 != item2 {
                         if !labels.contains_key(&label_name) {
                             print_error(format!("\nCode:\n{} | {}\nProblem: Label `{}` does not exist.", line_number, string_line.clone(), label_name));
                         }

@@ -3,6 +3,7 @@ pub enum Types {
     String,
     Number,
     Identifier,
+    Unknown,
 }
 
 impl std::fmt::Display for Types {

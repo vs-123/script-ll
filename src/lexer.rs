@@ -1,9 +1,7 @@
 use crate::errors::Error;
 
 #[derive(Debug, Clone)]
-pub struct Line(
-    pub Vec<String>
-);
+pub struct Line(pub Vec<String>);
 
 pub fn lex(code: String) -> (Vec<Line>, Error) {
     let mut lexed_code: Vec<Line> = Vec::new();
@@ -13,7 +11,7 @@ pub fn lex(code: String) -> (Vec<Line>, Error) {
     let mut temp_string: String = String::new(); // Will be used for strings in ll
     let mut error: Error = Error::None;
 
-    for (line_number, line) in code.replace('\r', "").split('\n').enumerate() {
+    for (line_number, line) in code.replace('\r', "").trim().split('\n').enumerate() {
         let line_characters = &(*line).chars().collect::<Vec<char>>();
         for (character_index, &c) in line_characters.clone().iter().enumerate() {
             if c == '"' {
@@ -24,9 +22,13 @@ pub fn lex(code: String) -> (Vec<Line>, Error) {
                     temp_string.push(c);
                 }
             }
-            
+
             if is_string && character_index == line_characters.len() - 1 {
-                error = Error::LexingError(format!("\nCode:\n{} | {}\nProblem: String was never ended", line_number, &(*line)));
+                error = Error::LexingError(format!(
+                    "\nCode:\n{} | {}\nProblem: String was never ended",
+                    line_number,
+                    &(*line)
+                ));
                 break;
             } else if is_string {
                 temp_string.push(c);
