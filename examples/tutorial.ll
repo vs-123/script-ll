@@ -30,7 +30,7 @@ label print_can_drive_1
 label can_drive
     comment `exists` checks if a variable exists of a given type
     comment In this case, we check if there is a variable `age` which has a type `NUMBER`.
-    exists age NUMBER
+    exists age Number
     comment jmp_gt is a command which jumps to a label if the first value is greater than the second value.
     comment In this case, if `age` is greater than 17, then jump to `print_can_drive_1`
     jmp_gt age 17 _can_drive_1

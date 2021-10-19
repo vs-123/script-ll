@@ -1,8 +1,10 @@
 // #![allow(warnings, unused)]
 use std::collections::HashMap;
-use std::env::args;
+use std::process::Command;
+use std::env::{args, self};
 use std::fs::{self};
 use regex::Regex;
+use std::io::Write;
 
 mod ast;
 mod errors;
@@ -24,11 +26,11 @@ fn get_type(token: String) -> ast::Types {
 
 fn string_to_type(string: String) -> Result<ast::Types, Error> {
     match string.as_str() {
-        "NUMBER" => {
+        "Number" => {
             Ok(ast::Types::Number)
         }
 
-        "STRING" => {
+        "String" => {
             Ok(ast::Types::String)
         }
 
@@ -46,6 +48,25 @@ fn get_string_content(string: String) -> String {
         .unwrap()
         .as_str()
         .to_string()
+}
+
+fn get_variable(variable_name: String, variables: HashMap<String, String>) -> Result<(String, ast::Types), Error> {
+    match variables.get(&variable_name) {
+        Some(value) => {
+            let value = (*value).to_string();
+            let value_type = get_type(value.clone());
+            if value_type.clone() == ast::Types::Identifier {
+                let value = get_variable(value, variables)?;
+                Ok((value.0, value.1))
+            } else {
+                Ok((value.clone(), value_type))
+            }
+        }
+
+        None => {
+            Err(Error::RuntimeError(format!("Variable `{}` does not exist.", variable_name)))
+        }
+    }
 }
 
 fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<String, String>, labels: &mut HashMap<String, Vec<(usize, lexer::Line)>>) {
@@ -89,7 +110,18 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     print_error(format!("\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.", line_number, string_line.clone(), args_len));
                 } else {
                     let variable_name = args[0].clone();
-                    let variable_value = args[1].clone();
+                    let mut variable_value = args[1].clone();
+
+                    if get_type(variable_value.clone()) == ast::Types::Identifier {
+                        match get_variable(variable_value.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                variable_value = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
+                        }
+                    }
 
                     variables.insert(variable_name.clone(), variable_value.clone());
                 }
@@ -110,11 +142,15 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
                         // Variables
                         ast::Types::Identifier => {
-                            if !variables.contains_key(&to_print) {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), to_print));
+                            match get_variable(to_print.clone(), variables.clone()) {
+                                Ok((value, _)) => {
+                                    to_print = value;
+                                },
+                                Err(e) => {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                }
                             }
 
-                            to_print = variables.get(&to_print.to_string()).unwrap().to_string();
                             let to_print_type = get_type(to_print.clone());
 
                             if to_print_type == ast::Types::String {
@@ -143,18 +179,24 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     let mut item2 = args[1].clone();
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item1) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item1 = variables.get(&item1).unwrap().clone();
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                item1 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item2) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item2 = variables.get(&item2).unwrap().clone();
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                item2 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
@@ -197,18 +239,30 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     let mut item2 = args[1].clone();
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item1) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item1 = variables.get(&item1).unwrap().clone();
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item1 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item2) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item2 = variables.get(&item2).unwrap().clone();
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item2 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
@@ -233,18 +287,30 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     let mut item2 = args[1].clone();
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item1) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item1 = variables.get(&item1).unwrap().clone();
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item1 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item2) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item2 = variables.get(&item2).unwrap().clone();
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item2 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
@@ -269,18 +335,30 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     let mut item2 = args[1].clone();
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item1) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item1 = variables.get(&item1).unwrap().clone();
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item1 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item2) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item2 = variables.get(&item2).unwrap().clone();
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item2 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
@@ -305,18 +383,30 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     let mut item2 = args[1].clone();
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item1) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item1 = variables.get(&item1).unwrap().clone();
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item1 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item2) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item2 = variables.get(&item2).unwrap().clone();
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item2 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
@@ -358,27 +448,31 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     let label_name = args[2].clone();
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item1) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item1 = variables.get(&item1.to_string()).unwrap().clone();
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item1 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item2) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item2 = variables.get(&item2.to_string()).unwrap().clone();
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item2, value_type));
+                                }
+                                item2 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
-                    }
-
-                    if get_type(item1.clone()) != ast::Types::Number {
-                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot compare `{}` and `{}` as `{}` is not a numeric type.", line_number, string_line.clone(), args[0].clone(), args[1].clone(), args[0].clone()));
-                    }
-
-                    if get_type(item2.clone()) != ast::Types::Number {
-                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot compare `{}` and `{}` as `{}` is not a numeric type.", line_number, string_line.clone(), args[0].clone(), args[1].clone(), args[1].clone()));
                     }
 
                     if item1.parse::<f64>().unwrap() > item2.parse::<f64>().unwrap() {
@@ -402,18 +496,30 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     let label_name = args[2].clone();
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item1) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item1 = variables.get(&item1.to_string()).unwrap().clone();
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
+                                }
+                                item1 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item2) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item2 = variables.get(&item2.to_string()).unwrap().clone();
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                if value_type != ast::Types::Number {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item2, value_type));
+                                }
+                                item2 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
@@ -442,26 +548,38 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     print_error(format!("\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.", line_number, string_line.clone(), args_len));
                 } else {
                     let mut item1 = args[0].clone();
+                    let mut item1_type: ast::Types = ast::Types::Number;
+
                     let mut item2 = args[1].clone();
+                    let mut item2_type: ast::Types = ast::Types::Number;
+
                     let label_name = args[2].clone();
 
                     if get_type(item1.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item1) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item1 = variables.get(&item1.to_string()).unwrap().clone();
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                item1 = value;
+                                item1_type = value_type;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
                     if get_type(item2.clone()) == ast::Types::Identifier {
-                        if !variables.contains_key(&item2) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), item1));
-                        } else {
-                            item2 = variables.get(&item2.to_string()).unwrap().clone();
+                        match get_variable(item2.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                item2 = value;
+                                item2_type = value_type;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
                         }
                     }
 
-                    if get_type(item1.clone()) != get_type(item2.clone()) {
+                    if item1_type != item2_type {
                         print_error(format!("\nCode:\n{} | {}\nProblem: Cannot compare `{}` and `{}` as they are not the same type.", line_number, string_line.clone(), args[0].clone(), args[1].clone()));
                     }
 
@@ -481,7 +599,146 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                 if args_len != 1 {
                     print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
                 } else {
-                    variables.insert("TEMP".to_string(), args[0].clone());
+                    let mut item1 = args[0].clone();
+
+                    if get_type(item1.clone()) == ast::Types::Identifier {
+                        match get_variable(item1.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                item1 = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
+                        }
+                    }
+
+                    variables.insert("TEMP".to_string(), item1);
+                }
+            }
+
+            "get_os" => {
+                if args_len != 0 {
+                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 0 arguments, got {}.", line_number, string_line.clone(), args_len));
+                } else {
+                    variables.insert("TEMP".to_string(), env::consts::OS.to_string());
+                }
+            }
+
+            "cmd" => {
+                if args_len != 1 {
+                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                } else {
+                    let mut cmd = args[0].clone();
+
+                    if get_type(cmd.clone()) == ast::Types::Identifier {
+                        match get_variable(cmd.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                cmd = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
+                        }
+                    }
+                    
+                    if get_type(cmd.clone()) != ast::Types::String {
+                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot execute `{}` as it is not a string.", line_number, string_line.clone(), cmd));
+                    }
+
+                    let cmd = cmd.split(" ").collect::<Vec<&str>>();
+
+                    let mut command_to_execute = Command::new(cmd[0].clone());
+
+                    for i in 1..cmd.len() {
+                        command_to_execute.arg(cmd[i].clone());
+                    }
+
+                    match command_to_execute.output() {
+                        Ok(_) => {}
+
+                        Err(e) => {
+                            print_error(format!("\nCode:\n{} | {}\nProblem: Failed to execute command `{}`: {}", line_number, string_line.clone(), get_string_content(cmd.join(" ").clone()), e));
+                        }
+                    }
+                }
+            }
+
+            "input" => {
+                if args_len != 0 {
+                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 0 arguments, got {}.", line_number, string_line.clone(), args_len));
+                } else {
+                    let mut input = String::new();
+
+                    match std::io::stdout().flush() {
+                        Ok(_) => {}
+
+                        Err(e) => {
+                            print_error(format!("\nCode:\n{} | {}\nProblem: Failed to flush stdout: {}", line_number, string_line.clone(), e));
+                        }
+                    }
+                    std::io::stdin().read_line(&mut input).unwrap();
+
+                    variables.insert("TEMP".to_string(), "\"".to_owned() + &input.trim().to_owned() + "\"");
+                }
+            }
+
+            "to_number" => {
+                if args_len != 1 {
+                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                } else {
+                    let mut item = args[0].clone();
+
+                    if get_type(item.clone()) == ast::Types::Identifier {
+                        match get_variable(item.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                item = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
+                        }
+                    }
+
+                    if get_type(item.clone()) == ast::Types::String {
+                        item = get_string_content(item.clone());
+                    }
+
+                    match item.parse::<f64>() {
+                        Ok(_) => {
+                            variables.insert("TEMP".to_string(), item.to_string());
+                        },
+                        Err(_) => {
+                            print_error(format!("\nCode:\n{} | {}\nProblem: Cannot convert `{}` to a number.", line_number, string_line.clone(), item));
+                        }
+                    }
+                }
+            }
+
+            "to_string" => {
+                if args_len != 1 {
+                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                } else {
+                    let mut item = args[0].clone();
+
+                    if get_type(item.clone()) == ast::Types::Identifier {
+                        match get_variable(item.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                item = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
+                        }
+                    }
+
+                    match item.parse::<f64>() {
+                        Ok(_) => {
+                            variables.insert("TEMP".to_string(), item.to_string());
+                        },
+                        Err(_) => {
+                            print_error(format!("\nCode:\n{} | {}\nProblem: Cannot convert `{}` to a number.", line_number, string_line.clone(), item));
+                        }
+                    }
                 }
             }
 
@@ -548,17 +805,21 @@ fn main() {
 
                             _ => {
                                 label_code.push((line_number, lexer::Line(line.clone())));
-                                if line_number == lexed_code.len() {
-                                    labels.insert(current_label.clone(), label_code);
-                                    label_code = Vec::new();
-                                }
                             }
+                        }
+
+                        if line_number == lexed_code.len() {
+                            labels.insert(current_label.clone(), label_code);
+                            label_code = Vec::new();
                         }
                     }
 
-                    let entry_code = labels[&".ENTRY".to_string()].clone();
-
-                    interpret(entry_code, &mut variables, &mut labels);
+                    if labels.clone().contains_key(".ENTRY") {
+                        let entry_code = labels.get(".ENTRY").unwrap().clone();
+                        interpret(entry_code, &mut variables, &mut labels);
+                    } else {
+                        print_error(format!("\nError: Could not execute\nProblem: No `.ENTRY` label."));
+                    }
                 }
 
                 Err(e) => print_error(format!("Error: Could not open file `{}`\nProblem: {}", input_file, e)),
