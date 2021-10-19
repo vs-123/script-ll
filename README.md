@@ -21,7 +21,7 @@ To execute a script-ll file, follow the following steps:
 
 ## Commands
 
-Since 19 October 2021, there are 16 (sixteen) commands:
+Since 19 October 2021, there are 21 (twenty-one) commands:
 
 - `exists <VARIABLE_NAME> <TYPE> info: Checks for the existence of a variable called <IDENTIFIER> of type <TYPE>.`
 - `var <VARIABLE_NAME> <VARIABLE_VALUE> info: Creates a variable called <VARIABLE_NAME> with the value <VARIABLE_VALUE>.`
