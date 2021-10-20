@@ -1,12 +1,12 @@
 // #![allow(warnings, unused)]
-use std::collections::HashMap;
-use std::process::Command;
-use std::env::{args, self};
-use std::fs::{self};
 use regex::Regex;
-use std::io::Write;
+use std::collections::HashMap;
+use std::env::{self, args};
 use std::fs::File;
+use std::fs::{self};
 use std::io::Read;
+use std::io::Write;
+use std::process::Command;
 
 mod ast;
 mod errors;
@@ -17,7 +17,7 @@ use errors::*;
 fn get_type(token: String) -> ast::Types {
     let number_re = Regex::new(r"^[0-9]+$").unwrap();
     let identifier_re = Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*$").unwrap();
-    
+
     if token.starts_with('\"') && token.ends_with('\"') {
         ast::Types::String
     } else if number_re.is_match(&token) {
@@ -31,17 +31,11 @@ fn get_type(token: String) -> ast::Types {
 
 fn string_to_type(string: String) -> Result<ast::Types, Error> {
     match string.as_str() {
-        "Number" => {
-            Ok(ast::Types::Number)
-        }
+        "Number" => Ok(ast::Types::Number),
 
-        "String" => {
-            Ok(ast::Types::String)
-        }
+        "String" => Ok(ast::Types::String),
 
-        _ => {
-            Err(Error::RuntimeError("Invalid type".to_string()))
-        }
+        _ => Err(Error::RuntimeError("Invalid type".to_string())),
     }
 }
 
@@ -53,12 +47,13 @@ fn rem_first_and_last(value: &str) -> &str {
 }
 
 fn get_string_content(string: String) -> String {
-    rem_first_and_last(&string)
-        .to_string()
-        .replace("\\n", "\n")
+    rem_first_and_last(&string).to_string().replace("\\n", "\n")
 }
 
-fn get_variable(variable_name: String, variables: HashMap<String, String>) -> Result<(String, ast::Types), Error> {
+fn get_variable(
+    variable_name: String,
+    variables: HashMap<String, String>,
+) -> Result<(String, ast::Types), Error> {
     match variables.get(&variable_name) {
         Some(value) => {
             let value = (*value).to_string();
@@ -71,17 +66,22 @@ fn get_variable(variable_name: String, variables: HashMap<String, String>) -> Re
             }
         }
 
-        None => {
-            Err(Error::RuntimeError(format!("Variable `{}` does not exist.", variable_name)))
-        }
+        None => Err(Error::RuntimeError(format!(
+            "Variable `{}` does not exist.",
+            variable_name
+        ))),
     }
 }
 
-fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<String, String>, labels: &mut HashMap<String, Vec<(usize, lexer::Line)>>) {
+fn interpret(
+    lexed_code: Vec<(usize, lexer::Line)>,
+    variables: &mut HashMap<String, String>,
+    labels: &mut HashMap<String, Vec<(usize, lexer::Line)>>,
+) {
     for (line_number, line) in lexed_code.iter() {
         let line: Vec<String> = line.clone().0;
         let string_line = line.clone().join(" ");
-        
+
         let command: String = line[0].clone();
         let args: Vec<String> = line[1..].to_vec().clone();
         let args_len = args.len();
@@ -89,12 +89,22 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
         match command.clone().as_str() {
             "exists" => {
                 if args_len != 2 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let variable_name = args[0].clone();
 
                     if !variables.contains_key(&variable_name) {
-                        print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.", line_number, string_line.clone(), variable_name));
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Variable `{}` does not exist.",
+                            line_number,
+                            string_line.clone(),
+                            variable_name
+                        ));
                     }
 
                     let variable_type = get_type(variables.get(&variable_name).unwrap().clone());
@@ -105,9 +115,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                             if variable_type != required_type {
                                 print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `{}` is required.", line_number, string_line.clone(), variable_name, variable_type, required_type));
                             }
-                        },
+                        }
                         Err(e) => {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: {}",
+                                line_number,
+                                string_line.clone(),
+                                e
+                            ));
                         }
                     }
                 }
@@ -115,7 +130,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "var" => {
                 if args_len != 2 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let variable_name = args[0].clone();
                     let mut variable_value = args[1].clone();
@@ -124,9 +144,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         match get_variable(variable_value.clone(), variables.clone()) {
                             Ok((value, _)) => {
                                 variable_value = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -137,7 +162,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "print" => {
                 if args_len != 1 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut to_print = args[0].clone();
 
@@ -153,9 +183,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                             match get_variable(to_print.clone(), variables.clone()) {
                                 Ok((value, _)) => {
                                     to_print = value;
-                                },
+                                }
                                 Err(e) => {
-                                    print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                    print_error(format!(
+                                        "\nCode:\n{} | {}\nProblem: {}",
+                                        line_number,
+                                        string_line.clone(),
+                                        e
+                                    ));
                                 }
                             }
 
@@ -167,7 +202,11 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         }
 
                         _ => {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Invalid type.", line_number, string_line.clone()));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Invalid type.",
+                                line_number,
+                                string_line.clone()
+                            ));
                         }
                     }
 
@@ -177,7 +216,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "print_newline" => {
                 if args_len != 0 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 0 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 0 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     println!();
                 }
@@ -185,7 +229,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "add" => {
                 if args_len != 2 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item2 = args[1].clone();
@@ -194,9 +243,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         match get_variable(item1.clone(), variables.clone()) {
                             Ok((value, _)) => {
                                 item1 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -205,37 +259,65 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         match get_variable(item2.clone(), variables.clone()) {
                             Ok((value, _)) => {
                                 item2 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
 
                     match (get_type(item1.clone()), get_type(item2.clone())) {
                         (ast::Types::String, ast::Types::String) => {
-                            variables.insert("TEMP".to_string(), "\"".to_owned() + &get_string_content(item1.clone()) + &get_string_content(item2.clone()) + "\"");
+                            variables.insert(
+                                "TEMP".to_string(),
+                                "\"".to_owned()
+                                    + &get_string_content(item1.clone())
+                                    + &get_string_content(item2.clone())
+                                    + "\"",
+                            );
                         }
 
                         (ast::Types::Number, ast::Types::String) => {
-                            variables.insert("TEMP".to_string(), "\"".to_owned() + &item1.clone() + &get_string_content(item2.clone()) + "\"");
+                            variables.insert(
+                                "TEMP".to_string(),
+                                "\"".to_owned()
+                                    + &item1.clone()
+                                    + &get_string_content(item2.clone())
+                                    + "\"",
+                            );
                         }
 
                         (ast::Types::String, ast::Types::Number) => {
-                            variables.insert("TEMP".to_string(), "\"".to_owned() + &get_string_content(item1.clone()) + &item2.clone() + "\"");
+                            variables.insert(
+                                "TEMP".to_string(),
+                                "\"".to_owned()
+                                    + &get_string_content(item1.clone())
+                                    + &item2.clone()
+                                    + "\"",
+                            );
                         }
 
                         (ast::Types::Number, ast::Types::Number) => {
-                            let new_number = item1.clone().parse::<f64>().unwrap() + item2.clone().parse::<f64>().unwrap();
+                            let new_number = item1.clone().parse::<f64>().unwrap()
+                                + item2.clone().parse::<f64>().unwrap();
 
                             variables.insert("TEMP".to_string(), format!("{}", new_number));
                         }
 
                         _ => {
                             let mut not_supported_arg = args[0].clone();
-                            if get_type(args[0].clone()) != ast::Types::Number && get_type(args[0].clone()) != ast::Types::String  {
+                            if get_type(args[0].clone()) != ast::Types::Number
+                                && get_type(args[0].clone()) != ast::Types::String
+                            {
                                 not_supported_arg = args[0].clone();
-                            } else if get_type(args[1].clone()) != ast::Types::Number && get_type(args[1].clone()) != ast::Types::String {
+                            } else if get_type(args[1].clone()) != ast::Types::Number
+                                && get_type(args[1].clone()) != ast::Types::String
+                            {
                                 not_supported_arg = args[1].clone();
                             }
                             print_error(format!("\nCode:\n{} | {}\nProblem: Cannot add as `{}` is neither a string nor a number.", line_number, string_line.clone(), not_supported_arg))
@@ -246,7 +328,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "sub" => {
                 if args_len != 2 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item2 = args[1].clone();
@@ -258,9 +345,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item1 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -272,9 +364,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item2 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -287,14 +384,20 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         print_error(format!("\nCode:\n{} | {}\nProblem: Cannot subtract `{}` from `{}` as `{}` is not a numeric type.", line_number, string_line.clone(), args[1].clone(), args[0].clone(), args[1].clone()));
                     }
 
-                    let new_number = item1.clone().parse::<f64>().unwrap() - item2.clone().parse::<f64>().unwrap();
+                    let new_number = item1.clone().parse::<f64>().unwrap()
+                        - item2.clone().parse::<f64>().unwrap();
                     variables.insert("TEMP".to_string(), format!("{}", new_number));
                 }
             }
 
             "mul" => {
                 if args_len != 2 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item2 = args[1].clone();
@@ -306,9 +409,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item1 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -320,9 +428,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item2 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -335,14 +448,20 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         print_error(format!("\nCode:\n{} | {}\nProblem: Cannot multiply `{}` by `{}` as `{}` is not a numeric type.", line_number, string_line.clone(), args[0].clone(), args[1].clone(), args[1].clone()));
                     }
 
-                    let new_number = item1.clone().parse::<f64>().unwrap() * item2.clone().parse::<f64>().unwrap();
+                    let new_number = item1.clone().parse::<f64>().unwrap()
+                        * item2.clone().parse::<f64>().unwrap();
                     variables.insert("TEMP".to_string(), format!("{}", new_number));
                 }
             }
 
             "div" => {
                 if args_len != 2 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item2 = args[1].clone();
@@ -354,9 +473,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item1 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -368,9 +492,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item2 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -383,14 +512,20 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         print_error(format!("\nCode:\n{} | {}\nProblem: Cannot divide `{}` by `{}` as `{}` is not a numeric type.", line_number, string_line.clone(), args[0].clone(), args[1].clone(), args[1].clone()));
                     }
 
-                    let new_number = item1.clone().parse::<f64>().unwrap() / item2.clone().parse::<f64>().unwrap();
+                    let new_number = item1.clone().parse::<f64>().unwrap()
+                        / item2.clone().parse::<f64>().unwrap();
                     variables.insert("TEMP".to_string(), format!("{}", new_number));
                 }
             }
 
             "mod" => {
                 if args_len != 2 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item2 = args[1].clone();
@@ -402,9 +537,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item1 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -416,9 +556,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item2 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -431,19 +576,30 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         print_error(format!("\nCode:\n{} | {}\nProblem: Cannot compare `{}` and `{}` as `{}` is not a numeric type.", line_number, string_line.clone(), args[0].clone(), args[1].clone(), args[1].clone()));
                     }
 
-                    let new_number = item1.clone().parse::<f64>().unwrap() % item2.clone().parse::<f64>().unwrap();
+                    let new_number = item1.clone().parse::<f64>().unwrap()
+                        % item2.clone().parse::<f64>().unwrap();
                     variables.insert("TEMP".to_string(), format!("{}", new_number));
                 }
             }
 
             "jmp" => {
                 if args_len != 1 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let label_name = args[0].clone();
 
                     if !labels.contains_key(&label_name) {
-                        print_error(format!("\nCode:\n{} | {}\nProblem: Label `{}` does not exist.", line_number, string_line.clone(), label_name));
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Label `{}` does not exist.",
+                            line_number,
+                            string_line.clone(),
+                            label_name
+                        ));
                     }
 
                     let label_code = labels.get(&label_name).unwrap().clone();
@@ -454,7 +610,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "jmp_gt" => {
                 if args_len != 3 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item2 = args[1].clone();
@@ -467,9 +628,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item1 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -481,16 +647,26 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item2, value_type));
                                 }
                                 item2 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
 
                     if item1.parse::<f64>().unwrap() > item2.parse::<f64>().unwrap() {
                         if !labels.contains_key(&label_name) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Label `{}` does not exist.", line_number, string_line.clone(), label_name));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Label `{}` does not exist.",
+                                line_number,
+                                string_line.clone(),
+                                label_name
+                            ));
                         }
 
                         let label_code = labels.get(&label_name).unwrap().clone();
@@ -502,7 +678,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "jmp_lt" => {
                 if args_len != 3 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item2 = args[1].clone();
@@ -515,9 +696,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item1, value_type));
                                 }
                                 item1 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -529,9 +715,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                                     print_error(format!("\nCode:\n{} | {}\nProblem: Variable `{}` is of type `{}`, but `Number` is required.", line_number, string_line.clone(), item2, value_type));
                                 }
                                 item2 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -546,7 +737,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
                     if item1.parse::<f64>().unwrap() < item2.parse::<f64>().unwrap() {
                         if !labels.contains_key(&label_name) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Label `{}` does not exist.", line_number, string_line.clone(), label_name));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Label `{}` does not exist.",
+                                line_number,
+                                string_line.clone(),
+                                label_name
+                            ));
                         }
 
                         let label_code = labels.get(&label_name).unwrap().clone();
@@ -558,7 +754,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "jmp_eq" => {
                 if args_len != 3 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item1_type: ast::Types = get_type(item1.clone());
@@ -573,9 +774,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                             Ok((value, value_type)) => {
                                 item1 = value;
                                 item1_type = value_type;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -585,9 +791,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                             Ok((value, value_type)) => {
                                 item2 = value;
                                 item2_type = value_type;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -598,7 +809,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
                     if item1 == item2 {
                         if !labels.contains_key(&label_name) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Label `{}` does not exist.", line_number, string_line.clone(), label_name));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Label `{}` does not exist.",
+                                line_number,
+                                string_line.clone(),
+                                label_name
+                            ));
                         }
 
                         let label_code = labels.get(&label_name).unwrap().clone();
@@ -610,7 +826,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "jmp_not_eq" => {
                 if args_len != 3 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
                     let mut item1_type: ast::Types = ast::Types::Number;
@@ -625,9 +846,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                             Ok((value, value_type)) => {
                                 item1 = value;
                                 item1_type = value_type;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -637,9 +863,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                             Ok((value, value_type)) => {
                                 item2 = value;
                                 item2_type = value_type;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -650,7 +881,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
                     if item1 != item2 {
                         if !labels.contains_key(&label_name) {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Label `{}` does not exist.", line_number, string_line.clone(), label_name));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Label `{}` does not exist.",
+                                line_number,
+                                string_line.clone(),
+                                label_name
+                            ));
                         }
 
                         let label_code = labels.get(&label_name).unwrap().clone();
@@ -662,7 +898,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "return" => {
                 if args_len != 1 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item1 = args[0].clone();
 
@@ -670,9 +911,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         match get_variable(item1.clone(), variables.clone()) {
                             Ok((value, _)) => {
                                 item1 = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -683,7 +929,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "get_os" => {
                 if args_len != 0 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 0 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 0 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     variables.insert("TEMP".to_string(), env::consts::OS.to_string());
                 }
@@ -691,7 +942,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "cmd" => {
                 if args_len != 1 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut cmd = args[0].clone();
 
@@ -699,15 +955,25 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         match get_variable(cmd.clone(), variables.clone()) {
                             Ok((value, _)) => {
                                 cmd = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
-                    
+
                     if get_type(cmd.clone()) != ast::Types::String {
-                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot execute `{}` as it is not a string.", line_number, string_line.clone(), cmd));
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Cannot execute `{}` as it is not a string.",
+                            line_number,
+                            string_line.clone(),
+                            cmd
+                        ));
                     }
 
                     let cmd = cmd.split(' ').collect::<Vec<&str>>();
@@ -722,7 +988,13 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         Ok(_) => {}
 
                         Err(e) => {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Failed to execute command `{}`: {}", line_number, string_line.clone(), get_string_content(cmd.join(" ").clone()), e));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Failed to execute command `{}`: {}",
+                                line_number,
+                                string_line.clone(),
+                                get_string_content(cmd.join(" ").clone()),
+                                e
+                            ));
                         }
                     }
                 }
@@ -730,7 +1002,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "input" => {
                 if args_len != 0 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 0 arguments, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 0 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut input = String::new();
 
@@ -738,18 +1015,31 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         Ok(_) => {}
 
                         Err(e) => {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Failed to flush stdout: {}", line_number, string_line.clone(), e));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Failed to flush stdout: {}",
+                                line_number,
+                                string_line.clone(),
+                                e
+                            ));
                         }
                     }
                     std::io::stdin().read_line(&mut input).unwrap();
 
-                    variables.insert("TEMP".to_string(), "\"".to_owned() + &input.trim().to_owned() + "\"");
+                    variables.insert(
+                        "TEMP".to_string(),
+                        "\"".to_owned() + &input.trim().to_owned() + "\"",
+                    );
                 }
             }
 
             "to_number" => {
                 if args_len != 1 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item = args[0].clone();
 
@@ -757,9 +1047,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         match get_variable(item.clone(), variables.clone()) {
                             Ok((value, _)) => {
                                 item = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -771,9 +1066,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     match item.parse::<f64>() {
                         Ok(_) => {
                             variables.insert("TEMP".to_string(), item.to_string());
-                        },
+                        }
                         Err(_) => {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Cannot convert `{}` to a number.", line_number, string_line.clone(), item));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Cannot convert `{}` to a number.",
+                                line_number,
+                                string_line.clone(),
+                                item
+                            ));
                         }
                     }
                 }
@@ -781,7 +1081,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "to_string" => {
                 if args_len != 1 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item = args[0].clone();
 
@@ -789,9 +1094,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         match get_variable(item.clone(), variables.clone()) {
                             Ok((value, _)) => {
                                 item = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -803,7 +1113,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     } else if item_type.clone() == ast::Types::Number {
                         item = "\"".to_owned() + &item.to_string() + "\"";
                     } else {
-                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot convert `{}` to a string.", line_number, string_line.clone(), item));
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Cannot convert `{}` to a string.",
+                            line_number,
+                            string_line.clone(),
+                            item
+                        ));
                     }
 
                     variables.insert("TEMP".to_string(), item);
@@ -812,7 +1127,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
 
             "read_file" => {
                 if args_len != 1 {
-                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
                 } else {
                     let mut item = args[0].clone();
 
@@ -820,9 +1140,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         match get_variable(item.clone(), variables.clone()) {
                             Ok((value, _)) => {
                                 item = value;
-                            },
+                            }
                             Err(e) => {
-                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
                             }
                         }
                     }
@@ -834,19 +1159,30 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     let mut contents = String::new();
 
                     match File::open(get_string_content(item.clone())) {
-                        Ok(mut file) => {
-                            match file.read_to_string(&mut contents) {
-                                Ok(_) => {
-                                    variables.insert("TEMP".to_string(), "\"".to_owned() + &contents + "\"");
-                                },
-                                Err(e) => {
-                                    print_error(format!("\nCode:\n{} | {}\nProblem: Failed to read file `{}`: {}", line_number, string_line.clone(), item, e));
-                                }
+                        Ok(mut file) => match file.read_to_string(&mut contents) {
+                            Ok(_) => {
+                                variables
+                                    .insert("TEMP".to_string(), "\"".to_owned() + &contents + "\"");
                             }
-                        }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: Failed to read file `{}`: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    item,
+                                    e
+                                ));
+                            }
+                        },
 
                         Err(e) => {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Failed to open file `{}`: {}", line_number, string_line.clone(), item, e));
+                            print_error(format!(
+                                "\nCode:\n{} | {}\nProblem: Failed to open file `{}`: {}",
+                                line_number,
+                                string_line.clone(),
+                                item,
+                                e
+                            ));
                         }
                     }
                 }
@@ -857,7 +1193,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
             }
 
             _ => {
-                print_error(format!("\nCode:\n{} | {}\nProblem: Unknown command `{}`.", line_number, string_line.clone(), command.clone()));
+                print_error(format!(
+                    "\nCode:\n{} | {}\nProblem: Unknown command `{}`.",
+                    line_number,
+                    string_line.clone(),
+                    command.clone()
+                ));
             }
         }
     }
@@ -868,73 +1209,86 @@ fn main() {
     args.next().unwrap();
 
     match args.next() {
-        Some(input_file) => {
-            match fs::read_to_string(input_file.clone()) {
-                Ok(code) => {
-                    let (lexed_code, lexing_err) = lexer::lex(code);
+        Some(input_file) => match fs::read_to_string(input_file.clone()) {
+            Ok(code) => {
+                let (lexed_code, lexing_err) = lexer::lex(code);
 
-                    if lexing_err != Error::None {
-                        if let Error::LexingError(err) = lexing_err {
-                            print_error(err);
-                        }
-                    }
-
-                    let mut variables: HashMap<String, String> = HashMap::new();
-                    let mut labels: HashMap<String, Vec<(usize, lexer::Line)>> = HashMap::new();
-                    let mut current_label: String = "".to_string();
-                    let mut label_code: Vec<(usize, lexer::Line)> = Vec::new();
-
-                    for (line_number, line) in lexed_code.iter().enumerate() {
-                        let line_number = line_number + 1;
-                        let line: Vec<String> = line.clone().0;
-                        if line.is_empty() {
-                            continue;
-                        }
-                        let string_line = line.clone().join(" ");
-                        
-                        let command: String = line[0].clone();
-                        let args: Vec<String> = line[1..].to_vec().clone();
-                        let args_len = args.len();
-
-                        match command.clone().as_str() {
-                            "label" => {
-                                if args_len != 1 {
-                                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
-                                } else {
-                                    labels.insert(current_label.clone(), label_code);
-                                    label_code = Vec::new();
-
-                                    let label_name = args[0].clone();
-                                    current_label = label_name.clone();
-
-                                    if labels.contains_key(&label_name) {
-                                        print_error(format!("\nCode:\n{} | {}\nProblem: Label `{}` already exists.", line_number, string_line.clone(), label_name));
-                                    }
-                                }
-                            }
-
-                            _ => {
-                                label_code.push((line_number, lexer::Line(line.clone())));
-                            }
-                        }
-
-                        if line_number == lexed_code.len() {
-                            labels.insert(current_label.clone(), label_code);
-                            label_code = Vec::new();
-                        }
-                    }
-
-                    if labels.clone().contains_key(".ENTRY") {
-                        let entry_code = labels.get(".ENTRY").unwrap().clone();
-                        interpret(entry_code, &mut variables, &mut labels);
-                    } else {
-                        print_error("\nError: Could not execute\nProblem: No `.ENTRY` label.".to_string());
+                if lexing_err != Error::None {
+                    if let Error::LexingError(err) = lexing_err {
+                        print_error(err);
                     }
                 }
 
-                Err(e) => print_error(format!("Error: Could not open file `{}`\nProblem: {}", input_file, e)),
+                let mut variables: HashMap<String, String> = HashMap::new();
+                let mut labels: HashMap<String, Vec<(usize, lexer::Line)>> = HashMap::new();
+                let mut current_label: String = "".to_string();
+                let mut label_code: Vec<(usize, lexer::Line)> = Vec::new();
+
+                for (line_number, line) in lexed_code.iter().enumerate() {
+                    let line_number = line_number + 1;
+                    let line: Vec<String> = line.clone().0;
+                    if line.is_empty() {
+                        continue;
+                    }
+                    let string_line = line.clone().join(" ");
+
+                    let command: String = line[0].clone();
+                    let args: Vec<String> = line[1..].to_vec().clone();
+                    let args_len = args.len();
+
+                    match command.clone().as_str() {
+                        "label" => {
+                            if args_len != 1 {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.",
+                                    line_number,
+                                    string_line.clone(),
+                                    args_len
+                                ));
+                            } else {
+                                labels.insert(current_label.clone(), label_code);
+                                label_code = Vec::new();
+
+                                let label_name = args[0].clone();
+                                current_label = label_name.clone();
+
+                                if labels.contains_key(&label_name) {
+                                    print_error(format!(
+                                        "\nCode:\n{} | {}\nProblem: Label `{}` already exists.",
+                                        line_number,
+                                        string_line.clone(),
+                                        label_name
+                                    ));
+                                }
+                            }
+                        }
+
+                        _ => {
+                            label_code.push((line_number, lexer::Line(line.clone())));
+                        }
+                    }
+
+                    if line_number == lexed_code.len() {
+                        labels.insert(current_label.clone(), label_code);
+                        label_code = Vec::new();
+                    }
+                }
+
+                if labels.clone().contains_key(".ENTRY") {
+                    let entry_code = labels.get(".ENTRY").unwrap().clone();
+                    interpret(entry_code, &mut variables, &mut labels);
+                } else {
+                    print_error(
+                        "\nError: Could not execute\nProblem: No `.ENTRY` label.".to_string(),
+                    );
+                }
             }
-        }
+
+            Err(e) => print_error(format!(
+                "Error: Could not open file `{}`\nProblem: {}",
+                input_file, e
+            )),
+        },
 
         None => {
             println!("Usage: script-ll <source_code>.ll\nExample: script-ll examples/tutorial.ll");
