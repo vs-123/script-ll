@@ -5,6 +5,8 @@ use std::env::{args, self};
 use std::fs::{self};
 use regex::Regex;
 use std::io::Write;
+use std::fs::File;
+use std::io::Read;
 
 mod ast;
 mod errors;
@@ -43,14 +45,17 @@ fn string_to_type(string: String) -> Result<ast::Types, Error> {
     }
 }
 
+fn rem_first_and_last(value: &str) -> &str {
+    let mut chars = value.chars();
+    chars.next();
+    chars.next_back();
+    chars.as_str()
+}
+
 fn get_string_content(string: String) -> String {
-    let re = Regex::new(r#""(.*)""#).unwrap();
-    re.captures(&string)
-        .unwrap()
-        .get(1)
-        .unwrap()
-        .as_str()
+    rem_first_and_last(&string)
         .to_string()
+        .replace("\\n", "\n")
 }
 
 fn get_variable(variable_name: String, variables: HashMap<String, String>) -> Result<(String, ast::Types), Error> {
@@ -58,11 +63,11 @@ fn get_variable(variable_name: String, variables: HashMap<String, String>) -> Re
         Some(value) => {
             let value = (*value).to_string();
             let value_type = get_type(value.clone());
-            if value_type.clone() == ast::Types::Identifier {
+            if value_type == ast::Types::Identifier {
                 let value = get_variable(value, variables)?;
                 Ok((value.0, value.1))
             } else {
-                Ok((value.clone(), value_type))
+                Ok((value, value_type))
             }
         }
 
@@ -556,14 +561,14 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                     print_error(format!("\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.", line_number, string_line.clone(), args_len));
                 } else {
                     let mut item1 = args[0].clone();
-                    let mut item1_type: ast::Types = ast::Types::Number;
+                    let mut item1_type: ast::Types = get_type(item1.clone());
 
                     let mut item2 = args[1].clone();
-                    let mut item2_type: ast::Types = ast::Types::Number;
+                    let mut item2_type: ast::Types = get_type(item2.clone());
 
                     let label_name = args[2].clone();
 
-                    if get_type(item1.clone()) == ast::Types::Identifier {
+                    if item1_type.clone() == ast::Types::Identifier {
                         match get_variable(item1.clone(), variables.clone()) {
                             Ok((value, value_type)) => {
                                 item1 = value;
@@ -575,7 +580,7 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         }
                     }
 
-                    if get_type(item2.clone()) == ast::Types::Identifier {
+                    if item2_type.clone() == ast::Types::Identifier {
                         match get_variable(item2.clone(), variables.clone()) {
                             Ok((value, value_type)) => {
                                 item2 = value;
@@ -705,12 +710,12 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         print_error(format!("\nCode:\n{} | {}\nProblem: Cannot execute `{}` as it is not a string.", line_number, string_line.clone(), cmd));
                     }
 
-                    let cmd = cmd.split(" ").collect::<Vec<&str>>();
+                    let cmd = cmd.split(' ').collect::<Vec<&str>>();
 
-                    let mut command_to_execute = Command::new(cmd[0].clone());
+                    let mut command_to_execute = Command::new(cmd[0]);
 
-                    for i in 1..cmd.len() {
-                        command_to_execute.arg(cmd[i].clone());
+                    for i in cmd.iter().skip(1) {
+                        command_to_execute.arg(i);
                     }
 
                     match command_to_execute.output() {
@@ -791,12 +796,57 @@ fn interpret(lexed_code: Vec<(usize, lexer::Line)>, variables: &mut HashMap<Stri
                         }
                     }
 
-                    match item.parse::<f64>() {
-                        Ok(_) => {
-                            variables.insert("TEMP".to_string(), item.to_string());
-                        },
-                        Err(_) => {
-                            print_error(format!("\nCode:\n{} | {}\nProblem: Cannot convert `{}` to a number.", line_number, string_line.clone(), item));
+                    let item_type = get_type(item.clone());
+
+                    if item_type.clone() == ast::Types::String {
+                        // Do nothing
+                    } else if item_type.clone() == ast::Types::Number {
+                        item = "\"".to_owned() + &item.to_string() + "\"";
+                    } else {
+                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot convert `{}` to a string.", line_number, string_line.clone(), item));
+                    }
+
+                    variables.insert("TEMP".to_string(), item);
+                }
+            }
+
+            "read_file" => {
+                if args_len != 1 {
+                    print_error(format!("\nCode:\n{} | {}\nProblem: Expected 1 argument, got {}.", line_number, string_line.clone(), args_len));
+                } else {
+                    let mut item = args[0].clone();
+
+                    if get_type(item.clone()) == ast::Types::Identifier {
+                        match get_variable(item.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                item = value;
+                            },
+                            Err(e) => {
+                                print_error(format!("\nCode:\n{} | {}\nProblem: {}", line_number, string_line.clone(), e));
+                            }
+                        }
+                    }
+
+                    if get_type(item.clone()) != ast::Types::String {
+                        print_error(format!("\nCode:\n{} | {}\nProblem: Cannot read file `{}` as it is not a string.", line_number, string_line.clone(), item));
+                    }
+
+                    let mut contents = String::new();
+
+                    match File::open(get_string_content(item.clone())) {
+                        Ok(mut file) => {
+                            match file.read_to_string(&mut contents) {
+                                Ok(_) => {
+                                    variables.insert("TEMP".to_string(), "\"".to_owned() + &contents + "\"");
+                                },
+                                Err(e) => {
+                                    print_error(format!("\nCode:\n{} | {}\nProblem: Failed to read file `{}`: {}", line_number, string_line.clone(), item, e));
+                                }
+                            }
+                        }
+
+                        Err(e) => {
+                            print_error(format!("\nCode:\n{} | {}\nProblem: Failed to open file `{}`: {}", line_number, string_line.clone(), item, e));
                         }
                     }
                 }
@@ -878,7 +928,7 @@ fn main() {
                         let entry_code = labels.get(".ENTRY").unwrap().clone();
                         interpret(entry_code, &mut variables, &mut labels);
                     } else {
-                        print_error(format!("\nError: Could not execute\nProblem: No `.ENTRY` label."));
+                        print_error("\nError: Could not execute\nProblem: No `.ENTRY` label.".to_string());
                     }
                 }
 

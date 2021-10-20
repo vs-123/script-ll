@@ -42,5 +42,6 @@ Since 19 October 2021, there are 21 (twenty-one) commands:
 - `get_os info: Detects the user's operating system and stores it to variable 'TEMP'.`
 - `cmd <STRING> info: Executes <STRING> where <STRING> is shell script, bash script, batch script, etc.`
 - `input info: Takes input from the command-line.`
-- `to_number <VARIABLE_NAME> info: Converts variable <VARIABLE_NAME> to 'Number' type.`
-- `to_string <VARIABLE_NAME> info: Converts variable <VARIABLE_NAME> to 'String' type.`
+- `to_number <VARIABLE_NAME> info: Converts variable <VARIABLE_NAME> to 'Number' type and stores it to 'TEMP'.`
+- `to_string <VARIABLE_NAME> info: Converts variable <VARIABLE_NAME> to 'String' type and stores it to 'TEMP'.`
+- `read_file <STRING> info: Reads file '<STRING>' and stores its content to 'TEMP' as a String type.`
