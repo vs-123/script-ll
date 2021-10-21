@@ -11,7 +11,7 @@ pub fn lex(code: String) -> (Vec<Line>, Error) {
     let mut temp_string: String = String::new(); // Will be used for strings in ll
     let mut error: Error = Error::None;
 
-    for (line_number, line) in code.replace('\r', "").trim().split('\n').enumerate() {
+    for (line_number, line) in code.replace('\r', "").replace('\t', "").trim().split('\n').enumerate() {
         let line_characters = &(*line).chars().collect::<Vec<char>>();
         for (character_index, &c) in line_characters.clone().iter().enumerate() {
             if c == '"' {

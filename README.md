@@ -22,7 +22,7 @@ To execute a script-ll file, follow the following steps:
 
 ## Commands
 
-Since 20 October 2021, there are 22 (twenty-one) commands:
+Since 21 October 2021, there are 26 (twenty-six) commands:
 
 - `exists <VARIABLE_NAME> <TYPE> info: Checks for the existence of a variable called <IDENTIFIER> of type <TYPE>.`
 - `var <VARIABLE_NAME> <VARIABLE_VALUE> info: Creates a variable called <VARIABLE_NAME> with the value <VARIABLE_VALUE>.`
@@ -46,3 +46,7 @@ Since 20 October 2021, there are 22 (twenty-one) commands:
 - `to_number <VARIABLE_NAME> info: Converts variable <VARIABLE_NAME> to 'Number' type and stores it to 'TEMP'.`
 - `to_string <VARIABLE_NAME> info: Converts variable <VARIABLE_NAME> to 'String' type and stores it to 'TEMP'.`
 - `read_file <STRING> info: Reads file '<STRING>' and stores its content to 'TEMP' as a String type.`
+- `is_match <STRING_1> <STRING_2> info: Checks if <STRING_1> has a match for <STRING_2> where <STRING_2> is a regex, if so, returns Number '1' otherwise '0' and then stores it to 'TEMP' as type Number`
+- `count_matches <STRING_1> <STRING_2> info: Counts the number of matches <STRING_1> for <STRING_2> where <STRING_2> is a regex and stores it to 'TEMP' as type Number.`
+- `replace_all <STRING_1> <STRING_2> <STRING_3> info: Replaces all matches of <STRING_2> in <STRING_1> with <STRING_3> where <STRING_2> is a regex and then stores the resulting string to 'TEMP'`
+- `replace_n <STRING_1> <STRING_2> <STRING_3> <NUMBER> info: Replaces <NUMBER> matches of <STRING_2> in <STRING_1> with <STRING_3> where <STRING_2> is a regex and then stores the resulting string to 'TEMP'`

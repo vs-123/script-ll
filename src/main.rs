@@ -1188,6 +1188,435 @@ fn interpret(
                 }
             }
 
+            "is_match" => {
+                if args_len != 2 {
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
+                } else {
+                    let mut item = args[0].clone();
+                    let item_type = get_type(item.clone());
+
+                    if item_type.clone() == ast::Types::Identifier {
+                        match get_variable(item.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                item = value;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if item_type.clone() != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Cannot check if `{}` is a match for `{}` as it is not a string.",
+                            line_number,
+                            string_line.clone(),
+                            item,
+                            args[1].clone()
+                        ));
+                    }
+
+                    let mut pattern = args[1].clone();
+                    let mut pattern_type = get_type(pattern.clone());
+
+                    if pattern_type == ast::Types::Identifier {
+                        match get_variable(pattern.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                pattern = value;
+                                pattern_type = value_type;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if pattern_type != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Pattern `{}` is not of type String.",
+                            line_number,
+                            string_line.clone(),
+                            args[1].clone()
+                        ));
+                    }
+
+                    pattern = get_string_content(pattern);
+
+                    if let Ok(re) = Regex::new(&pattern) {
+                        if re.is_match(&item) {
+                            variables.insert("TEMP".to_string(), "1".to_string());
+                        } else {
+                            variables.insert("TEMP".to_string(), "0".to_string());
+                        }
+                    } else {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Pattern `{}` is not a valid regular expression.",
+                            line_number,
+                            string_line.clone(),
+                            args[1].clone()
+                        ));
+                    }
+                }
+            }
+
+            "count_matches" => {
+                if args_len != 2 {
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 2 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
+                } else {
+                    let mut item = args[0].clone();
+                    let item_type = get_type(item.clone());
+
+                    if item_type.clone() == ast::Types::Identifier {
+                        match get_variable(item.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                item = value;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if item_type.clone() != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Cannot check if `{}` is a match for `{}` as it is not a string.",
+                            line_number,
+                            string_line.clone(),
+                            item,
+                            args[1].clone()
+                        ));
+                    }
+
+                    let mut pattern = args[1].clone();
+                    let mut pattern_type = get_type(pattern.clone());
+
+                    if pattern_type == ast::Types::Identifier {
+                        match get_variable(pattern.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                pattern = value;
+                                pattern_type = value_type;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if pattern_type != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Pattern `{}` is not of type String.",
+                            line_number,
+                            string_line.clone(),
+                            args[1].clone()
+                        ));
+                    }
+
+                    pattern = get_string_content(pattern);
+
+                    if let Ok(re) = Regex::new(&pattern) {
+                        variables.insert("TEMP".to_string(), re.find_iter(&item).count().to_string());
+                    } else {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Pattern `{}` is not a valid regular expression.",
+                            line_number,
+                            string_line.clone(),
+                            args[1].clone()
+                        ));
+                    }
+                }
+            }
+
+            "replace_n" => {
+                if args_len != 4 {
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
+                } else {
+                    let mut item = args[0].clone();
+                    let item_type = get_type(item.clone());
+
+                    if item_type.clone() == ast::Types::Identifier {
+                        match get_variable(item.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                item = value;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if item_type.clone() != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Cannot check if `{}` is a match for `{}` as it is not a string.",
+                            line_number,
+                            string_line.clone(),
+                            item,
+                            args[1].clone()
+                        ));
+                    }
+
+                    let mut pattern = args[1].clone();
+                    let mut pattern_type = get_type(pattern.clone());
+
+                    if pattern_type == ast::Types::Identifier {
+                        match get_variable(pattern.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                pattern = value;
+                                pattern_type = value_type;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if pattern_type != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Pattern `{}` is not of type String.",
+                            line_number,
+                            string_line.clone(),
+                            args[1].clone()
+                        ));
+                    }
+
+                    pattern = get_string_content(pattern.clone());
+
+                    let mut replacement = args[2].clone();
+                    let mut replacement_type = get_type(replacement.clone());
+
+                    if replacement_type == ast::Types::Identifier {
+                        match get_variable(replacement.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                replacement = value;
+                                replacement_type = value_type;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if replacement_type != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Replacement `{}` is not of type String.",
+                            line_number,
+                            string_line.clone(),
+                            args[2].clone()
+                        ));
+                    }
+
+                    replacement = get_string_content(replacement);
+
+                    let mut count = args[3].clone();
+                    let mut count_type = get_type(count.clone());
+
+                    if count_type == ast::Types::Identifier {
+                        match get_variable(replacement.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                count = value;
+                                count_type = value_type;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if count_type != ast::Types::Number {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Replacement `{}` is not of type Number.",
+                            line_number,
+                            string_line.clone(),
+                            args[2].clone()
+                        ));
+                    }
+
+                    if let Ok(count) = count.parse::<usize>() {
+                        let re = Regex::new(&pattern).unwrap();
+                        let result = re.replacen(&item, count, &replacement);
+
+                        variables.insert("TEMP".to_string(), result.to_string());
+                    } else {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: `{}` is supposed to be an integer less than 18446744073709551616.",
+                            line_number,
+                            string_line.clone(),
+                            args[3].clone()
+                        ));
+                    }
+                }
+            }
+
+            "replace_all" => {
+                if args_len != 3 {
+                    print_error(format!(
+                        "\nCode:\n{} | {}\nProblem: Expected 3 arguments, got {}.",
+                        line_number,
+                        string_line.clone(),
+                        args_len
+                    ));
+                } else {
+                    let mut item = args[0].clone();
+                    let item_type = get_type(item.clone());
+
+                    if item_type.clone() == ast::Types::Identifier {
+                        match get_variable(item.clone(), variables.clone()) {
+                            Ok((value, _)) => {
+                                item = value;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if item_type.clone() != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Cannot check if `{}` is a match for `{}` as it is not a string.",
+                            line_number,
+                            string_line.clone(),
+                            item,
+                            args[1].clone()
+                        ));
+                    }
+
+                    let mut pattern = args[1].clone();
+                    let mut pattern_type = get_type(pattern.clone());
+
+                    if pattern_type == ast::Types::Identifier {
+                        match get_variable(pattern.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                pattern = value;
+                                pattern_type = value_type;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if pattern_type != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Pattern `{}` is not of type String.",
+                            line_number,
+                            string_line.clone(),
+                            args[1].clone()
+                        ));
+                    }
+
+                    pattern = get_string_content(pattern.clone());
+
+                    let mut replacement = args[2].clone();
+                    let mut replacement_type = get_type(replacement.clone());
+
+                    if replacement_type == ast::Types::Identifier {
+                        match get_variable(replacement.clone(), variables.clone()) {
+                            Ok((value, value_type)) => {
+                                replacement = value;
+                                replacement_type = value_type;
+                            }
+                            Err(e) => {
+                                print_error(format!(
+                                    "\nCode:\n{} | {}\nProblem: {}",
+                                    line_number,
+                                    string_line.clone(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+
+                    if replacement_type != ast::Types::String {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Replacement `{}` is not of type String.",
+                            line_number,
+                            string_line.clone(),
+                            args[2].clone()
+                        ));
+                    }
+
+                    replacement = get_string_content(replacement);
+
+                    if let Ok(re) = Regex::new(&pattern) {
+                        variables.insert(
+                            "TEMP".to_string(),
+                            re.replace_all(&item, &replacement).to_string(),
+                        );
+                    } else {
+                        print_error(format!(
+                            "\nCode:\n{} | {}\nProblem: Pattern `{}` is not a valid regular expression.",
+                            line_number,
+                            string_line.clone(),
+                            args[1].clone()
+                        ));
+                    }
+                }
+            }
+
             "comment" => {
                 // Do nothing
             }
